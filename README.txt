@@ -1,0 +1,2 @@
+This repo contains processed data from Kinetic Monte Carlo simulations of Li plating and dendrite growth at Li anode.
+Each file contains results from a set of simulations with different overpotentials or SEI thicknesses, indicated by tab names.
