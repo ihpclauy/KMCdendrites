@@ -1,0 +1,72 @@
+# SPPARKS Li plating input script
+
+seed	        12345
+
+app_style       erbium
+
+variable	jr equal 1000.							# local current density (mA/cm2)
+variable	T equal 300.							# temperature (K)
+variable	c0 equal 1.							# Li ion molarity (mol/l)
+
+variable	t equal 20.							# simulation duration (s)
+variable	nx equal 100							# # sites in x direction
+variable	ny equal 100							# # sites in y direction
+variable	nz equal 1000							# # sites in z direction
+variable 	nz0 equal 62							# initial z position of SEI-electrolyte interface
+
+variable	k equal 8.617e-5 						# Boltzmann constant (eV/K)
+variable	avo equal 6.02214e23 						# Avogadro number
+variable	F equal 96485332.1 						# Faraday constant (s mA/mol)
+variable	d equal 3.5 							# lattice constant (Angstrom)
+variable	nu equal 2.0e12 						# attempt frequency (Hz)
+
+variable	kT equal $k*$T 							# temperature in eV
+variable	Edep equal -${kT}*ln(${avo}*${jr}*$d*$d/$F/${nu}*1.0e-16) 	# Li deposition barrier (eV)
+variable	n0 equal ${avo}*${c0}*$d*$d*$d*1.0e-27*0.5			# Li ion fraction
+
+variable	Edesolv equal 0.43-${kT}*ln(${n0})				# desolvation barrier (eV)
+variable	Eresolv equal 0.43-${kT}*ln(1.-${n0})				# resolvation barrier (eV)
+
+variable	tn equal ${nu}*$t						# simulation duration in units of attempt time
+variable	tout equal ${tn}/100.						# output interval
+
+dimension	3
+boundary	p p n
+lattice         sc/6n $d
+region		box block 0 ${nx} 0 ${ny} 0 ${nz}
+
+create_box	box
+create_sites	box
+
+region		electrode block 0 ${nx} 0 ${ny} 0 1
+region		electrolyte block 0 ${nx} 0 ${ny} ${nz0} ${nz}
+
+set	        i1 value 3
+set		i2 value 4							# vacancies
+set		i2 value 2 fraction ${n0}					# Li ions
+set		i2 value 3 region electrode					# Li atoms
+set		i2 value 1 region electrolyte					# electrolyte
+
+sector		no
+solve_style     tree 
+
+# events
+
+event	        2 tet tet h vac 0.497 vac h					# diffusion
+event	        2 tet tet he h ${Edep} he he 					# deposition
+event	        2 tet tet er vac ${Edesolv} h vac				# desolvation
+event	        2 tet tet er h ${Eresolv} er er					# resolvation
+
+temperature	${kT}
+
+diag_style      erbium stats yes &
+		list er h he vac events d1 d2 d3 d4
+diag_style	propensity
+stats           ${tout}
+dump            1 text ${tout} dump.li x y z i2 i2
+
+dump threedee image ${tout} *.png i2 site shape cube box no .1 size 1024 1024 zoom 1.0 crange 1 4 sdiam $d #view 90.0 90.0 #boundary d1 1
+dump_modify threedee scolor 1 blue scolor 2 red scolor 3 green scolor 4 black backcolor gray
+
+run             ${tn}
+
